@@ -1,0 +1,32 @@
+{
+  "entities": {
+    "Diagram": {
+      "title": "Diagram",
+      "type": "object",
+      "description": "A saved flowchart diagram with source code, AST metadata, and academic tags.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "filename": { "type": "string" },
+        "language": { "type": "string" },
+        "sourceCode": { "type": "string" },
+        "mermaidSyntax": { "type": "string" },
+        "complexity": { "type": "string" },
+        "statusBadge": { "type": "string" },
+        "nodeCount": { "type": "number" },
+        "edgeCount": { "type": "number" },
+        "pipelineNodes": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "language", "sourceCode", "mermaidSyntax"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/diagrams/{diagramId}": {
+      "schema": "Diagram",
+      "description": "User-specific flowchart diagrams. Only the authenticated owner can access."
+    }
+  }
+}

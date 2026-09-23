@@ -1,0 +1,6 @@
+{
+  "name": "FlowGenius",
+  "description": "Offline-first code-to-flowchart IDE with academic homework headers, AST parsing, and cloud sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

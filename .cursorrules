@@ -1,0 +1,24 @@
+.cursorrules
+# Project Rules & Coding Standards
+
+## 1. Paradigm & Structure (STRICT)
+- ALL code must follow strict Object-Oriented Programming (OOP) principles.
+- Use Classes for modules (e.g., `CodeParser`, `DiagramRenderer`, `HistoryManager`, `FirestoreSync`).
+- Use Interfaces/Types for data structures.
+- Encapsulate logic; strictly avoid global variables and spaghetti functions.
+
+## 2. Backend & Firestore (STRICT)
+- DO NOT use n8n, Docker, or any external backend servers. 
+- USE EXCLUSIVELY Firebase/Firestore for data persistence and Cloud Functions if server logic is needed.
+- Firestore Security Rules and Paths must strictly use EVEN path segments (e.g., `users/{userId}/diagrams/{diagramId}`). NEVER use odd segments for document references to prevent "invalid argument" errors.
+
+## 3. PWA & Offline-First
+- A valid `manifest.json` and robust Service Workers are mandatory.
+- Implement IndexedDB for local data storage. The app MUST perform all CRUD operations on IndexedDB first, then sync to Firestore in the background when online.
+- Diagram parsing and rendering must happen 100% client-side.
+
+## 4. Refactoring Rule
+- When prompting an AI for modifications or refactoring, you MUST include: "Respeta la estructura actual de la app dictada en las .cursorrules". Do not break OOP structure or offline capabilities.
+
+## 5. Version Control
+- Commit changes incrementally using Git. Meaningful commit messages are required.
