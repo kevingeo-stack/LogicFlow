@@ -210,13 +210,32 @@ describe('ExportManager', () => {
     expect(finalRatio).toBeCloseTo(intrinsicRatio, 2);
   });
 
-  it('should call html2canvas when exporting Pseudocode JPG', async () => {
-    const html2canvasMock = (await import('html2canvas')).default;
-    const mockHtml = typeof window !== 'undefined' ? document.createElement('div') : {} as any;
-    if (typeof window === 'undefined') {
-      Object.setPrototypeOf(mockHtml, HTMLElement.prototype);
-    }
-    
+  it('should clone the element and use max scrollWidth for html2canvas to prevent clipping', async () => {
+    const html2canvasMock = (await import('html2canvas')).default as any;
+    html2canvasMock.mockClear();
+
+    const mockClone = {
+      style: {
+        position: '', top: '', left: '', width: '', height: '', overflow: '', margin: '', backgroundColor: ''
+      }
+    } as any;
+
+    const mockPre = {
+      scrollWidth: 1200, clientWidth: 1200, offsetWidth: 1200,
+      scrollHeight: 600, clientHeight: 600, offsetHeight: 600,
+      cloneNode: vi.fn().mockReturnValue(mockClone)
+    } as any;
+
+    const mockHtml = {
+      scrollWidth: 1200, clientWidth: 400, offsetWidth: 400,
+      scrollHeight: 600, clientHeight: 600, offsetHeight: 600,
+      querySelector: vi.fn().mockReturnValue(mockPre),
+      appendChild: vi.fn()
+    } as any;
+
+    const appendSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((() => {}) as any);
+    const removeSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((() => {}) as any);
+
     const originalCreateElement = document.createElement.bind(document);
     const mockCompositeCanvas = {
       width: 800,
@@ -230,6 +249,7 @@ describe('ExportManager', () => {
       }),
       toDataURL: vi.fn().mockReturnValue('data:image/jpeg;base64,123'),
     };
+    
     vi.spyOn(document, 'createElement').mockImplementation((tag) => {
       if (tag === 'canvas') return mockCompositeCanvas as any;
       if (tag === 'a') return { click: vi.fn(), href: '', download: '' } as any;
@@ -239,6 +259,20 @@ describe('ExportManager', () => {
     await exportManager.exportImage(dummyDiagram, dummySettings, mockHtml, 'jpg');
     
     expect(mockRenderer.exportToCanvas).not.toHaveBeenCalled();
-    expect(html2canvasMock).toHaveBeenCalledWith(mockHtml, { backgroundColor: '#060e20' });
+    expect(mockPre.cloneNode).toHaveBeenCalledWith(true);
+    expect(appendSpy).toHaveBeenCalledWith(mockClone);
+
+    expect(html2canvasMock).toHaveBeenCalledWith(
+      mockClone, 
+      expect.objectContaining({ 
+        backgroundColor: '#060e20',
+        width: 1200,
+        height: 600,
+        scale: 2
+      })
+    );
+    
+    expect(mockClone.style.overflow).toBe('visible');
+    expect(mockClone.style.width).toBe('1200px');
   });
 });

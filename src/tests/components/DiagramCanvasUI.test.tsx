@@ -63,4 +63,13 @@ describe('DiagramCanvasUI', () => {
     // Test that the PseudocodeUI component renders generated pseudocode containing our label
     expect(screen.getByText(/hello/i)).toBeTruthy();
   });
+
+  it('PseudocodeUI pre tag allows horizontal scroll without clipping via min-w-max', () => {
+    render(<DiagramCanvasUI {...(defaultProps as any)} diagramViewMode="pseudocode" />);
+    
+    // The pre tag should have 'min-w-max' to ensure long lines don't get clipped by padding
+    const preElement = screen.getByText(/hello/i).closest('pre');
+    expect(preElement).not.toBeNull();
+    expect(preElement?.className).toContain('min-w-max');
+  });
 });

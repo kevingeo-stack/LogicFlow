@@ -54,6 +54,40 @@ export class ExportManager {
     const contentWidth = pageWidth - margin * 2;
     let currentY = margin;
 
+    // Helper to robustly capture HTML without parent clipping
+    const captureHtml = async (el: HTMLElement): Promise<HTMLCanvasElement> => {
+      const preEl = el.querySelector('pre');
+      const target = preEl || el;
+      
+      const capWidth = Math.max(target.scrollWidth, target.clientWidth, target.offsetWidth);
+      const capHeight = Math.max(target.scrollHeight, target.clientHeight, target.offsetHeight);
+
+      const clone = target.cloneNode(true) as HTMLElement;
+      clone.style.position = 'absolute';
+      clone.style.top = '-9999px';
+      clone.style.left = '-9999px';
+      clone.style.width = `${capWidth}px`;
+      clone.style.height = `${capHeight}px`;
+      clone.style.overflow = 'visible';
+      clone.style.margin = '0';
+      clone.style.backgroundColor = '#060e20';
+
+      document.body.appendChild(clone);
+
+      try {
+        return await html2canvas(clone, { 
+          backgroundColor: '#060e20',
+          width: capWidth,
+          height: capHeight,
+          windowWidth: Math.max(window.innerWidth, capWidth),
+          windowHeight: Math.max(window.innerHeight, capHeight),
+          scale: 2 
+        });
+      } finally {
+        document.body.removeChild(clone);
+      }
+    };
+
     // 1. DYNAMIC ACADEMIC HEADER TILE (Homework Mode)
     const timestamp = this.getTimestamp(settings);
 
@@ -135,7 +169,7 @@ export class ExportManager {
         if (isSvg) {
           canvas = await this.renderer.exportToCanvas(element as SVGElement, diagram.mermaidSyntax);
         } else {
-          canvas = await html2canvas(element as HTMLElement, { backgroundColor: '#060e20' });
+          canvas = await captureHtml(element as HTMLElement);
         }
         const imgData = canvas.toDataURL('image/png');
         
@@ -479,7 +513,37 @@ export class ExportManager {
     if (isSvg) {
       rawCanvas = await this.renderer.exportToCanvas(element as SVGElement, diagram.mermaidSyntax);
     } else {
-      rawCanvas = await html2canvas(element as HTMLElement, { backgroundColor: '#060e20' });
+      const el = element as HTMLElement;
+      const preEl = el.querySelector('pre');
+      const target = preEl || el;
+      
+      const capWidth = Math.max(target.scrollWidth, target.clientWidth, target.offsetWidth);
+      const capHeight = Math.max(target.scrollHeight, target.clientHeight, target.offsetHeight);
+
+      const clone = target.cloneNode(true) as HTMLElement;
+      clone.style.position = 'absolute';
+      clone.style.top = '-9999px';
+      clone.style.left = '-9999px';
+      clone.style.width = `${capWidth}px`;
+      clone.style.height = `${capHeight}px`;
+      clone.style.overflow = 'visible';
+      clone.style.margin = '0';
+      clone.style.backgroundColor = '#060e20';
+
+      document.body.appendChild(clone);
+
+      try {
+        rawCanvas = await html2canvas(clone, { 
+          backgroundColor: '#060e20',
+          width: capWidth,
+          height: capHeight,
+          windowWidth: Math.max(window.innerWidth, capWidth),
+          windowHeight: Math.max(window.innerHeight, capHeight),
+          scale: 2 
+        });
+      } finally {
+        document.body.removeChild(clone);
+      }
     }
 
     // Create composite canvas with academic banner

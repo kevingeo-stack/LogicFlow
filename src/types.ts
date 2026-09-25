@@ -48,6 +48,11 @@ export interface ASTNode {
   type: 'start' | 'process' | 'decision' | 'loop' | 'end' | 'call' | 'io' | 'block_end';
   label: string;
   details?: string;
+  ioType?: 'input' | 'output';
+  variableName?: string;
+  variableType?: string;
+  expression?: string;
+  message?: string;
 }
 
 export interface ASTEdge {

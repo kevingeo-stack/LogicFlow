@@ -106,7 +106,7 @@ export class CodeParser {
       if (text.startsWith('if ') || text.startsWith('if(')) {
         const condId = `Cond_${nodeIndex++}`;
         const cleanCond = text.replace(/^if\s*\(?/, '').replace(/\)?:?\s*\{?$/, '').trim();
-        nodes.push({ id: condId, type: 'decision', label: `${cleanCond.slice(0, 32)} ?` });
+        nodes.push({ id: condId, type: 'decision', label: `${cleanCond} ?`, expression: cleanCond });
 
         for (const exit of currentExits) {
           edges.push({ from: exit.id, to: condId, label: exit.label });
@@ -138,7 +138,7 @@ export class CodeParser {
              // elif is essentially another decision on the 'No' branch of the previous 'if'
              const elifId = `Elif_${nodeIndex++}`;
              const cond = text.replace(/^(?:elif|else\s+if)\s*\(?/, '').replace(/\)?:?\s*\{?$/, '').trim();
-             nodes.push({ id: elifId, type: 'decision', label: `${cond.slice(0, 32)} ?`, details: 'elif' });
+             nodes.push({ id: elifId, type: 'decision', label: `${cond} ?`, details: 'elif', expression: cond });
              
              edges.push({ from: topBlock.decisionNodeId, to: elifId, label: 'false' });
              
@@ -155,7 +155,7 @@ export class CodeParser {
         const loopId = `Loop_${nodeIndex++}`;
         const cleanCond = text.replace(/^(?:while|for)\s*\(?/, '').replace(/\)?:?\s*\{?$/, '').trim();
         const typeStr = text.startsWith('for') ? 'for' : 'while';
-        nodes.push({ id: loopId, type: 'loop', label: cleanCond.slice(0, 32), details: typeStr });
+        nodes.push({ id: loopId, type: 'loop', label: cleanCond, details: typeStr, expression: cleanCond });
 
         for (const exit of currentExits) {
           edges.push({ from: exit.id, to: loopId, label: exit.label });
@@ -189,9 +189,49 @@ export class CodeParser {
 
       // Process (or IO)
       const procId = `Proc_${nodeIndex++}`;
-      const isIo = text.includes('print(') || text.includes('console.log(') || text.includes('input(') || text.includes('scanf(');
+      let cleanText = text.replace(/;$/, '');
       
-      nodes.push({ id: procId, type: isIo ? 'io' : (text.includes('(') ? 'call' : 'process'), label: text.replace(/;$/, '').replace(/"/g, "'").slice(0, 40) });
+      let nodeProps: Partial<ASTNode> = {
+        type: 'process',
+        label: cleanText,
+        expression: cleanText
+      };
+
+      const inputMatch = cleanText.match(/^([a-zA-Z0-9_]+)\s*=\s*(float|int|str|bool)?\s*\(?\s*input\s*\((.*)\)\s*\)?$/);
+      const outMatch = cleanText.match(/^(?:print|console\.log)\s*\((.*)\)$/);
+      const assignMatch = cleanText.match(/^([a-zA-Z0-9_]+)\s*=\s*(.*)$/);
+
+      if (inputMatch) {
+         nodeProps.type = 'io';
+         nodeProps.ioType = 'input';
+         nodeProps.variableName = inputMatch[1];
+         nodeProps.variableType = inputMatch[2] || 'str';
+         
+         let msg = inputMatch[3];
+         if (inputMatch[2] && msg.endsWith(')')) {
+             msg = msg.slice(0, -1);
+         }
+         nodeProps.message = this.normalizeStringContent(msg);
+      } else if (outMatch) {
+         nodeProps.type = 'io';
+         nodeProps.ioType = 'output';
+         nodeProps.message = this.normalizeStringContent(outMatch[1]);
+      } else if (assignMatch) {
+         nodeProps.type = 'process';
+         nodeProps.variableName = assignMatch[1];
+         nodeProps.expression = assignMatch[2];
+      } else if (cleanText.includes('print(') || cleanText.includes('console.log(') || cleanText.includes('input(') || cleanText.includes('scanf(')) {
+         nodeProps.type = 'io';
+      } else if (cleanText.includes('(')) {
+         nodeProps.type = 'call';
+      }
+      
+      nodes.push({
+        id: procId,
+        type: nodeProps.type as any,
+        label: nodeProps.label!,
+        ...nodeProps
+      });
 
       for (const exit of currentExits) {
         edges.push({ from: exit.id, to: procId, label: exit.label });
@@ -245,6 +285,41 @@ export class CodeParser {
     };
   }
 
+  private normalizeStringContent(text: string): string {
+    text = text.trim();
+    const fStringMatch = text.match(/^f(["'])(.*)\1$/);
+    if (fStringMatch) {
+      let content = fStringMatch[2];
+      content = content.replace(/\\n/g, '');
+      
+      const parts: string[] = [];
+      let lastIdx = 0;
+      const regex = /\{([^}]+)\}/g;
+      let m;
+      while ((m = regex.exec(content)) !== null) {
+        if (m.index > lastIdx) {
+          parts.push('"' + content.substring(lastIdx, m.index) + '"');
+        }
+        const expr = m[1].split(':')[0].trim();
+        parts.push(expr);
+        lastIdx = regex.lastIndex;
+      }
+      if (lastIdx < content.length) {
+        parts.push('"' + content.substring(lastIdx) + '"');
+      }
+      return parts.join(', ');
+    }
+
+    const stringMatch = text.match(/^["'](.*)["']$/);
+    if (stringMatch) {
+      let content = stringMatch[1];
+      content = content.replace(/\\n/g, '');
+      return `"${content}"`;
+    }
+
+    return text.replace(/\\n/g, '');
+  }
+
   private buildMermaidMarkup(nodes: ASTNode[], edges: ASTEdge[], diagramLang: DiagramLanguage): string {
     const lines: string[] = ['flowchart TD'];
 
@@ -255,10 +330,33 @@ export class CodeParser {
 
     nodes.forEach((n) => {
       if (n.type === 'block_end') return;
-      let text = n.label.replace(/"/g, "'").replace(/[\[\]\(\)\{\}]/g, '');
+      
+      let text = n.label;
+      if (n.type === 'io') {
+        if (n.ioType === 'input' && n.variableName) {
+           // Semantic diagram mapping for Input: 'Leer variable' doesn't exist in translations? Wait.
+           // In translations: 'diagram.input': 'INPUT' / 'ENTRADA'. Let's use 'diagram.input' + var name
+           // Or just 'Leer var'? The prompt says 'Leer calificacion1' for diagram. But let's use the translation?
+           // Ah, prompt: "Diagrama: Leer calificacion1" or "o la notación equivalente ya establecida por el proyecto".
+           // Proyecto has `diagram.input`. So `${td('diagram.input', diagramLang)} ${n.variableName}` is good.
+           // Let's use 'Leer' or 'INPUT'
+           text = `${td('diagram.input', diagramLang)} ${n.variableName}`;
+        } else if (n.ioType === 'output' && n.message) {
+           text = `${td('diagram.output', diagramLang)} ${n.message}`;
+        }
+      } else if (n.type === 'process' && n.variableName && n.expression) {
+         text = `${n.variableName} ← ${n.expression}`;
+      } else if (n.type === 'decision' && n.expression) {
+         text = `${n.expression} ?`;
+      } else if (n.expression) {
+         text = n.expression;
+      }
+      
+      // Escape double quotes to &quot; so Mermaid doesn't break, keep all brackets/parentheses
+      text = text.replace(/"/g, '&quot;');
       
       if (n.type === 'start') {
-        text = td('diagram.start', diagramLang) + (text ? `: ${text}` : '');
+        text = td('diagram.start', diagramLang) + (n.label ? `: ${n.label.replace(/"/g, '&quot;')}` : '');
         lines.push(`  ${n.id}(["${text}"]):::startEnd`);
       } else if (n.type === 'end') {
         text = td('diagram.end', diagramLang);

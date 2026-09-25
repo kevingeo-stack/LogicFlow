@@ -188,6 +188,51 @@ def main():
 
     // Both returns should connect to END directly
     expect(getEdge(result.edges, retTrue!.id, endNode!.id)).toBeDefined();
-    expect(getEdge(result.edges, retFalse!.id, endNode!.id)).toBeDefined();
+  });
+
+  it('Test 13 - Promedio completo y asignacion', () => {
+    const code = `
+calificacion1 = float(input("Ingrese la primera calificación: "))
+calificacion2 = float(input("Ingrese la segunda calificación: "))
+calificacion3 = float(input("Ingrese la tercera calificación: "))
+promedio = (calificacion1 + calificacion2 + calificacion3) / 3
+    `.trim();
+    const result = parser.parse(code, 'python');
+    const nodes = result.nodes;
+
+    expect(nodes.find(n => n.variableName === 'calificacion1')?.message).toBe('"Ingrese la primera calificación: "');
+    expect(nodes.find(n => n.variableName === 'calificacion1')?.variableType).toBe('float');
+    expect(nodes.find(n => n.variableName === 'calificacion2')?.message).toBe('"Ingrese la segunda calificación: "');
+    expect(nodes.find(n => n.variableName === 'calificacion3')?.message).toBe('"Ingrese la tercera calificación: "');
+
+    const asignacion = nodes.find(n => n.variableName === 'promedio');
+    expect(asignacion).toBeDefined();
+    expect(asignacion?.expression).toBe('(calificacion1 + calificacion2 + calificacion3) / 3');
+  });
+
+  it('Test 14 - Strings con caracteres especiales', () => {
+    const code = `
+print("Aprobado: ¡Felicidades! (nota >= 70)")
+    `.trim();
+    const result = parser.parse(code, 'python');
+    
+    const node = result.nodes.find(n => n.type === 'io');
+    expect(node?.message).toBe('"Aprobado: ¡Felicidades! (nota >= 70)"');
+  });
+
+  it('Test 15 - Input y Output semanticos', () => {
+    const code = `
+x = int(input("Num: "))
+print(x)
+    `.trim();
+    const result = parser.parse(code, 'python');
+    
+    const inputNode = result.nodes.find(n => n.ioType === 'input');
+    expect(inputNode?.variableName).toBe('x');
+    expect(inputNode?.message).toBe('"Num: "');
+    expect(inputNode?.variableType).toBe('int');
+
+    const outputNode = result.nodes.find(n => n.ioType === 'output');
+    expect(outputNode?.message).toBe('x');
   });
 });

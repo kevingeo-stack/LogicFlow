@@ -9,10 +9,10 @@ export const PseudocodeUI: React.FC<PseudocodeUIProps> = ({ pseudocode, containe
   return (
     <div 
       ref={containerRef}
-      className="w-full h-[440px] sm:h-[500px] overflow-auto bg-[#060e20] p-6"
+      className="w-full h-[440px] sm:h-[500px] overflow-auto bg-[#060e20]"
     >
       <pre 
-        className="font-['JetBrains_Mono',monospace] text-[13px] leading-relaxed text-[#dae2fd]"
+        className="font-['JetBrains_Mono',monospace] text-[13px] leading-relaxed text-[#dae2fd] p-6 min-w-max"
       >
         {pseudocode}
       </pre>
